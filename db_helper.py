@@ -23,3 +23,16 @@ class DB:
             with conn.cursor() as cur:
                 cur.execute(sql)
                 return cur.fetchall()  # [(id, name, price, stock), ...]
+
+    # 상품 추가
+    def insert_item(self, name, price, stock):
+        sql = "INSERT INTO items (name, price, stock) VALUES (%s, %s, %s)"
+        with self.connect() as conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (name, price, stock))
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                return False
