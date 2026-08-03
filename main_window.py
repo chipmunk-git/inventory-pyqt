@@ -1,8 +1,10 @@
 # main_window.py
 import sys
-from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QFormLayout, QTableWidget, QTableWidgetItem, \
-    QLineEdit, QPushButton, QMessageBox, QApplication
+from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QTableWidget, \
+    QTableWidgetItem, QLineEdit, QPushButton, QMessageBox, QApplication, QCheckBox, QFrame
+from PyQt5.QtCore import Qt
 from db_helper import DB, DB_CONFIG
+from trash_dialog import TrashDialog
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -11,6 +13,7 @@ class MainWindow(QMainWindow):
         self.db = DB(**DB_CONFIG)
 
         # 중앙 위젯 및 레이아웃
+        self.resize(620, 520)
         central = QWidget()
         self.setCentralWidget(central)
         vbox = QVBoxLayout(central)
@@ -32,15 +35,39 @@ class MainWindow(QMainWindow):
         form_box.addLayout(form)
         form_box.addWidget(self.btn_add)
 
-        # 중앙: 테이블 위젯
+        # 입력 폼과 목록 조작 영역 사이의 구분선
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+
+        # 목록 조작 영역
+        list_controls = QHBoxLayout()
+
+        self.check_all = QCheckBox("전체 선택")
+        self.check_all.stateChanged.connect(self.set_all_checked)
+
+        self.btn_soft_delete = QPushButton("선택 삭제")
+        self.btn_soft_delete.clicked.connect(self.soft_delete_selected_items)
+
+        self.btn_trash = QPushButton("휴지통 열기")
+        self.btn_trash.clicked.connect(self.open_trash)
+
+        list_controls.addWidget(self.check_all)
+        list_controls.addWidget(self.btn_soft_delete)
+        list_controls.addStretch()
+        list_controls.addWidget(self.btn_trash)
+
+        # 상품 목록 테이블
         self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["ID", "이름", "가격", "재고"])
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["선택", "ID", "이름", "가격", "재고"])
         self.table.setEditTriggers(self.table.NoEditTriggers)  # 표준 예시: 목록은 읽기 전용
         self.table.verticalHeader().setVisible(False)
 
         # 배치
         vbox.addLayout(form_box)
+        vbox.addWidget(separator)
+        vbox.addLayout(list_controls)
         vbox.addWidget(self.table)
 
         # 초기 데이터 로드
@@ -48,12 +75,22 @@ class MainWindow(QMainWindow):
 
     def load_items(self):
         rows = self.db.fetch_items()
+
+        self.check_all.blockSignals(True)
+        self.check_all.setChecked(False)
+        self.check_all.blockSignals(False)
+
         self.table.setRowCount(len(rows))
         for r, (iid, name, price, stock) in enumerate(rows):
-            self.table.setItem(r, 0, QTableWidgetItem(str(iid)))
-            self.table.setItem(r, 1, QTableWidgetItem(name))
-            self.table.setItem(r, 2, QTableWidgetItem(str(price)))
-            self.table.setItem(r, 3, QTableWidgetItem(str(stock)))
+            check_item = QTableWidgetItem()
+            check_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable)
+            check_item.setCheckState(Qt.Unchecked)
+
+            self.table.setItem(r, 0, check_item)
+            self.table.setItem(r, 1, QTableWidgetItem(str(iid)))
+            self.table.setItem(r, 2, QTableWidgetItem(name))
+            self.table.setItem(r, 3, QTableWidgetItem(str(price)))
+            self.table.setItem(r, 4, QTableWidgetItem(str(stock)))
         self.table.resizeColumnsToContents()
 
     def add_item(self):
@@ -87,6 +124,43 @@ class MainWindow(QMainWindow):
             self.load_items()
         else:
             QMessageBox.critical(self, "실패", "추가 중 오류가 발생했습니다.")
+
+    def set_all_checked(self, state):
+        check_state = Qt.Checked if state == Qt.Checked else Qt.Unchecked
+
+        for row in range(self.table.rowCount()):
+            self.table.item(row, 0).setCheckState(check_state)
+
+    def soft_delete_selected_items(self):
+        item_ids = self._get_checked_item_ids()
+
+        if not item_ids:
+            QMessageBox.warning(self, "오류", "삭제할 상품을 선택하세요.")
+            return
+
+        # 소프트 삭제는 확인 메시지 없이 즉시 처리
+        if self.db.soft_delete_items(item_ids):
+            self.load_items()
+        else:
+            QMessageBox.critical(self, "실패", "삭제 중 오류가 발생했습니다.")
+
+    def open_trash(self):
+        dialog = TrashDialog(self)
+        dialog.exec_()
+
+        # 휴지통에서 복원한 상품이 있을 수 있으므로 목록 갱신
+        self.load_items()
+
+    def _get_checked_item_ids(self):
+        item_ids = []
+
+        for row in range(self.table.rowCount()):
+            check_item = self.table.item(row, 0)
+
+            if check_item.checkState() == Qt.Checked:
+                item_id = int(self.table.item(row, 1).text())
+                item_ids.append(item_id)
+        return item_ids
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
