@@ -1,17 +1,18 @@
 # main_window.py
-import sys
 from PyQt5.QtWidgets import QMainWindow, QWidget, QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, \
-    QTableWidget, QTableWidgetItem, QLineEdit, QPushButton, QMessageBox, QApplication, QCheckBox, QFrame
+    QTableWidget, QTableWidgetItem, QLineEdit, QPushButton, QMessageBox, QCheckBox, QFrame
 from PyQt5.QtCore import Qt
 from db_helper import DB, DB_CONFIG
 from trash_dialog import TrashDialog
 from item_edit_dialog import ItemEditDialog
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, user_id):
         super().__init__()
         self.setWindowTitle("소매하는다람쥐 둔산1호점 재고 관리")
         self.db = DB(**DB_CONFIG)
+
+        self.user_id = user_id
 
         # 중앙 위젯 및 레이아웃
         self.resize(620, 520)
@@ -75,7 +76,7 @@ class MainWindow(QMainWindow):
         self.load_items()
 
     def load_items(self):
-        rows = self.db.fetch_items()
+        rows = self.db.fetch_items(self.user_id)
 
         self.check_all.blockSignals(True)
         self.check_all.setChecked(False)
@@ -123,7 +124,7 @@ class MainWindow(QMainWindow):
         if stock < 0:
             QMessageBox.warning(self, "오류", "재고를 0개 이상 입력하세요.")
             return
-        ok = self.db.insert_item(name, price, stock)
+        ok = self.db.insert_item(self.user_id, name, price, stock)
         if ok:
             QMessageBox.information(self, "완료", "추가되었습니다.")
             self.input_name.clear()
@@ -134,7 +135,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "실패", "추가 중 오류가 발생했습니다.")
 
     def open_item_edit_dialog(self, iid, name, price, stock):
-        dialog = ItemEditDialog(iid, name, price, stock, self)
+        dialog = ItemEditDialog(iid, name, price, stock, self.user_id, self)
 
         if dialog.exec_() == QDialog.Accepted and dialog.updated:
             self.load_items()
@@ -153,13 +154,13 @@ class MainWindow(QMainWindow):
             return
 
         # 소프트 삭제는 확인 메시지 없이 즉시 처리
-        if self.db.soft_delete_items(item_ids):
+        if self.db.soft_delete_items(self.user_id, item_ids):
             self.load_items()
         else:
             QMessageBox.critical(self, "실패", "삭제 중 오류가 발생했습니다.")
 
     def open_trash(self):
-        dialog = TrashDialog(self)
+        dialog = TrashDialog(self.user_id, self)
         dialog.exec_()
 
         # 휴지통에서 복원한 상품이 있을 수 있으므로 목록 갱신
@@ -175,9 +176,3 @@ class MainWindow(QMainWindow):
                 item_id = int(self.table.item(row, 1).text())
                 item_ids.append(item_id)
         return item_ids
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    myWindow = MainWindow()
-    myWindow.show()
-    app.exec_()

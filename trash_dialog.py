@@ -5,10 +5,12 @@ from PyQt5.QtCore import Qt
 from db_helper import DB, DB_CONFIG
 
 class TrashDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, user_id, parent=None):
         super().__init__(parent)
         self.setWindowTitle("휴지통")
         self.db = DB(**DB_CONFIG)
+
+        self.user_id = user_id
 
         self.resize(650, 400)
         vbox = QVBoxLayout(self)
@@ -47,7 +49,7 @@ class TrashDialog(QDialog):
         self.load_deleted_items()
 
     def load_deleted_items(self):
-        rows = self.db.fetch_deleted_items()
+        rows = self.db.fetch_deleted_items(self.user_id)
 
         self.check_all.blockSignals(True)
         self.check_all.setChecked(False)
@@ -85,7 +87,7 @@ class TrashDialog(QDialog):
             QMessageBox.warning(self, "오류", "복원할 상품을 선택하세요.")
             return
 
-        if self.db.restore_items(item_ids):
+        if self.db.restore_items(self.user_id, item_ids):
             self.load_deleted_items()
         else:
             QMessageBox.critical(self, "실패", "복원 중 오류가 발생했습니다.")
@@ -109,7 +111,7 @@ class TrashDialog(QDialog):
         if answer != QMessageBox.Yes:
             return
 
-        if self.db.permanently_delete_items(item_ids):
+        if self.db.permanently_delete_items(self.user_id, item_ids):
             self.load_deleted_items()
         else:
             QMessageBox.critical(self, "실패", "영구 삭제 중 오류가 발생했습니다.")

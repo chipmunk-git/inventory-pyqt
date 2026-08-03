@@ -4,10 +4,12 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLin
 from db_helper import DB, DB_CONFIG
 
 class ItemEditDialog(QDialog):
-    def __init__(self, iid, name, price, stock, parent=None):
+    def __init__(self, iid, name, price, stock, user_id, parent=None):
         super().__init__(parent)
         self.setWindowTitle("상품 수정")
         self.db = DB(**DB_CONFIG)
+
+        self.user_id = user_id
 
         self.original_values = (name, price, stock)
         self.updated = False
@@ -68,7 +70,7 @@ class ItemEditDialog(QDialog):
             self.accept()
             return
 
-        ok = self.db.update_item(int(self.input_id.text()), name, price, stock)
+        ok = self.db.update_item(self.user_id, int(self.input_id.text()), name, price, stock)
         if ok:
             self.updated = True
             QMessageBox.information(self, "완료", "수정되었습니다.")
