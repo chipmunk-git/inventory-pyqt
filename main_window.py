@@ -1,10 +1,11 @@
 # main_window.py
 import sys
-from PyQt5.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QTableWidget, \
-    QTableWidgetItem, QLineEdit, QPushButton, QMessageBox, QApplication, QCheckBox, QFrame
+from PyQt5.QtWidgets import QMainWindow, QWidget, QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, \
+    QTableWidget, QTableWidgetItem, QLineEdit, QPushButton, QMessageBox, QApplication, QCheckBox, QFrame
 from PyQt5.QtCore import Qt
 from db_helper import DB, DB_CONFIG
 from trash_dialog import TrashDialog
+from item_edit_dialog import ItemEditDialog
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -59,8 +60,8 @@ class MainWindow(QMainWindow):
 
         # 상품 목록 테이블
         self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["선택", "ID", "이름", "가격", "재고"])
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["선택", "ID", "이름", "가격", "재고", "수정"])
         self.table.setEditTriggers(self.table.NoEditTriggers)  # 표준 예시: 목록은 읽기 전용
         self.table.verticalHeader().setVisible(False)
 
@@ -91,6 +92,13 @@ class MainWindow(QMainWindow):
             self.table.setItem(r, 2, QTableWidgetItem(name))
             self.table.setItem(r, 3, QTableWidgetItem(str(price)))
             self.table.setItem(r, 4, QTableWidgetItem(str(stock)))
+
+            btn_edit = QPushButton("수정")
+            btn_edit.clicked.connect(
+                lambda checked=False, item_id=iid, item_name=name, item_price=price, item_stock=stock:
+                self.open_item_edit_dialog(item_id, item_name, item_price, item_stock)
+            )
+            self.table.setCellWidget(r, 5, btn_edit)
         self.table.resizeColumnsToContents()
 
     def add_item(self):
@@ -124,6 +132,12 @@ class MainWindow(QMainWindow):
             self.load_items()
         else:
             QMessageBox.critical(self, "실패", "추가 중 오류가 발생했습니다.")
+
+    def open_item_edit_dialog(self, iid, name, price, stock):
+        dialog = ItemEditDialog(iid, name, price, stock, self)
+
+        if dialog.exec_() == QDialog.Accepted and dialog.updated:
+            self.load_items()
 
     def set_all_checked(self, state):
         check_state = Qt.Checked if state == Qt.Checked else Qt.Unchecked

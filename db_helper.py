@@ -45,6 +45,19 @@ class DB:
                 conn.rollback()
                 return False
 
+    # 상품 수정
+    def update_item(self, item_id, name, price, stock):
+        sql = "UPDATE items SET name = %s, price = %s, stock = %s WHERE id = %s AND deleted_at IS NULL"
+        with self.connect() as conn:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(sql, (name, price, stock, item_id))
+                conn.commit()
+                return True
+            except Exception:
+                conn.rollback()
+                return False
+
     # 선택한 상품을 휴지통으로 이동
     def soft_delete_items(self, item_ids):
         if not item_ids:
